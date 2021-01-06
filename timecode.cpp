@@ -4,14 +4,22 @@
 #include <iomanip>
 #include <exception>
 
+#include <set>
+
 class Timecode
 {
 private:
-	long long frame_number;
+	long frame_number;
 	short frame_rate;
+	bool drop_frame;
+
+	bool isCompatible(const Timecode& comp) const
+	{
+		return (comp.getRate() == getRate()) && (comp.isDropFrame() == isDropFrame());
+	}
 
 public:
-	Timecode(const long long& fc, const float& fr = 23.98)
+	Timecode(const long& fc, const float& fr = 23.98)
 	{
 		if (fr <= 0)
 		{
@@ -24,9 +32,15 @@ public:
 		
 		frame_number = fc;
 		frame_rate = round(fr);
+		drop_frame = false; // for now
 	}
 
-	long long getFrameNumber() const
+	short getRate() const
+	{
+		return frame_rate;
+	}
+
+	long getFrameNumber() const
 	{
 		return frame_number;
 	}
@@ -51,6 +65,47 @@ public:
 		return frame_number / frame_rate / 60 / 60;
 	}
 
+	bool isDropFrame() const
+	{
+		return drop_frame;
+	}
+
+	bool operator== (const Timecode& comp) const
+	{
+		return isCompatible(comp) && (comp.getFrameNumber() == getFrameNumber());
+	}
+
+	bool operator!= (const Timecode& comp) const
+	{
+		return isCompatible(comp) && (comp.getFrameNumber() != getFrameNumber());
+	}
+
+	bool operator< (const Timecode& comp) const
+	{
+		if (isCompatible(comp))
+			return getFrameNumber() < comp.getFrameNumber();
+		else
+			return getRate() < comp.getRate();
+	}
+
+	bool operator> (const Timecode& comp) const
+	{
+		if (isCompatible(comp))
+			return getFrameNumber() > comp.getFrameNumber();
+		else
+			return getRate() < comp.getRate();
+	}
+
+
+
+	Timecode operator+(const Timecode& comp)
+	{
+		if (!isCompatible(comp))
+			throw std::exception("Timecodes must be the same rate");
+
+		return Timecode(comp.getFrameNumber() + getFrameNumber(), getRate());
+	}
+
 	std::string getTimecode() const
 	{
 		std::ostringstream output;
@@ -67,9 +122,24 @@ public:
 
 int main()
 {
-	for (unsigned long int x = 0; x < 240; ++x)
+	using namespace std;
+	set<Timecode> timecodes;
+
+
+	for (short x = 30; x > 0; --x)
 	{
-		Timecode tc = Timecode(x);
-		std::cout << "Timecode for " << tc.getFrameNumber() << " is " << tc << std::endl;
+		timecodes.insert(Timecode(86400 + x));
+		timecodes.insert(Timecode(120600 + x, 30));
 	}
+	cout << endl << "---------" << endl;
+
+	//timecodes.sort();
+	
+	cout << "List has " << timecodes.size() << " elements:" << endl;
+	for (const auto& tc : timecodes)
+	{
+		cout << tc << " @ " << tc.getRate() << endl;
+	}
+
+	return 0;
 }
